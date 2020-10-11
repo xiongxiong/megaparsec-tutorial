@@ -2,16 +2,16 @@
 
 module Main where
 
-import Control.Applicative
-import Control.Monad
+import Control.Applicative ( optional, Alternative((<|>), some) )
 import Data.Text (Text)
 import Data.Void
-import Text.Megaparsec hiding (State, some)
-import Text.Megaparsec.Char
-import Text.Megaparsec.Debug
+import Text.Megaparsec
+    ( (<?>), choice, Parsec, MonadParsec(label, try) )
+import Text.Megaparsec.Char ( alphaNumChar, char, string )
+import Text.Megaparsec.Debug ( dbg )
 import qualified Data.Text as T
 import qualified Text.Megaparsec.Char.Lexer as L
-import Data.List
+import Data.List ( sortOn )
 
 -- scheme:[//[user:password@]host[:port]][/]path[?query][#fragment]
 
@@ -41,6 +41,14 @@ pUri = do
         authHost <- T.pack <$> dbg "host" (some (alphaNumChar <|> char '.')) <?> "hostname"
         authPort <- dbg "port" $ optional (char ':' *> label "port number" L.decimal)
         return Authority {..}
+    optional $ char '/'
+    uriPath <- T.pack <$> dbg "path" (some (alphaNumChar <|> char '/')) <?> "path"
+    uriQuery <- dbg "query" . optional $ do
+        char '?'
+        T.pack <$> some (alphaNumChar <|> char '=' <|> char '&') <?> "query"
+    uriSegment <- dbg "segment" . optional $ do
+        char '#'
+        T.pack <$> some alphaNumChar <?> "segment"
     return Uri {..}
 
 main :: IO ()
